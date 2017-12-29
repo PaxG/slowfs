@@ -15,19 +15,15 @@ import socket
 import sys
 import threading
 import time
-import fuse      # Filesystem in UserSpacE
-import six       # Python 2 and 3 Compatibility Library (2*3=6)
+import fuse
+import six
+import io
+
 
 def main(args):
     args = parse_args(args)
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO,
                         format='%(asctime)s %(levelname)s [%(name)s] %(message)s')
-    if not os.path.exists(args.mountpoint):
-        try:
-            os.mkdir(args.mountpoint)
-        except Exception as e:
-            print("Error creating mountpoint {}: {}".format(args.mountpoint, e))
-            sys.exit(1)
     config = Config(args.config)
     Controller(config)
     ops = SlowFS(args.root, config)
@@ -38,7 +34,7 @@ def parse_args(args):
     parser = argparse.ArgumentParser(description='A slow filesystem.')
     parser.add_argument('-c', '--config',
                         help='path to configuration file')
-    parser.add_argument('-d', '--debug', action='store_true',
+    parser.add_argument('--debug', action='store_true',
                         help=('enable extremely detailed and slow debug mode, '
                               'creating gigabytes of logs'))
     parser.add_argument('root', help='path to real file system')
@@ -68,10 +64,8 @@ class Config(object):
 
     def _load(self):
         d = {}
-        with open(self._path) as f:
-            # exec f in d, d   # Not Python3 compatible syntax
-            # f is now a io.TextIOWrapper object, whereas "exec" needs a string, bytes or code object => add .read() method
-            six.exec_(f.read(),d)   # Execute code in the scope of globals and locals. code can be a string or a code object. 
+        with io.open(self._path, "rb") as f:
+            six.exec_(f.read(), d)
         return d
 
 
@@ -105,7 +99,6 @@ class Controller(object):
     def _handle_command(self):
         try:
             msg, sender = self.sock.recvfrom(1024)
-        # except socket.error, e:    Not Python3 compatible syntax
         except socket.error as e:
             self.log.error("Error receiving from control socket: %s", e)
             return
